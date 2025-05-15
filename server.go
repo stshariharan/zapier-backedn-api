@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -171,7 +172,7 @@ func main() {
 	r.GET("/me", me)
 
 	log.Println("Server starting on :8080")
-	if err := r.Run(":8080"); err != nil {
+	if err := r.Run(":8081"); err != nil {
 		log.Fatal("Server failed to start: ", err)
 	}
 }
