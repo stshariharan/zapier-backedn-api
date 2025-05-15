@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -18,6 +19,8 @@ import (
 var (
 	users = make(map[string]string) // In-memory storage: username -> hashed password
 
+	subscriptions     = make(map[string]string) // In-memory storage: id -> targetUrl
+	subscriptionsMutex sync.Mutex             // Mutex for protecting access to the subscriptions map
 	// Replace with a strong, unique secret key for JWT signing
 	jwtSecret = []byte("your-secret-key")
 )
@@ -35,6 +38,10 @@ type SigninRequest struct {
 type Claims struct {
 	Username string `json:"username"`
 	jwt.StandardClaims
+}
+
+type SubscribeRequest struct {
+	TargetUrl string `json:"targetUrl" binding:"required"`
 }
 
 // generateJWT generates a new JWT token for the given username.
@@ -164,12 +171,64 @@ func me(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"username": claims.Username})
 }
 
+func subscribe(c *gin.Context) {
+	var req SubscribeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Generate a unique identifier (you might want a more robust method in production)
+	id := fmt.Sprintf("%d", time.Now().UnixNano())
+
+	// Store the target URL in the in-memory map with a mutex
+	subscriptionsMutex.Lock()
+	subscriptions[id] = req.TargetUrl
+	subscriptionsMutex.Unlock()
+
+	c.JSON(http.StatusOK, gin.H{"id": id})
+}
+
+func unsubscribe(c *gin.Context) {
+	id := c.Param("id")
+
+	subscriptionsMutex.Lock()
+	_, exists := subscriptions[id]
+	if exists {
+		delete(subscriptions, id)
+		subscriptionsMutex.Unlock()
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	} else {
+		subscriptionsMutex.Unlock()
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Subscription not found"})
+	}
+}
+
+func getSampleData(c *gin.Context) {
+	// Static sample data
+	sampleData := []map[string]interface{}{
+		{
+			"email":     "sample@example.com",
+			"message":   "This is a test message",
+			"timestamp": 1747401180000,
+		},
+	}
+
+	// Return the static data as JSON
+	c.JSON(http.StatusOK, sampleData)
+}
+
+
+
 func main() {
 	r := gin.Default()
 
 	r.POST("/register", register)
 	r.POST("/signin", signin)
 	r.GET("/me", me)
+	r.POST("/subscribe", subscribe) // New subscribe endpoint
+	r.DELETE("/subscribe/:id", unsubscribe) // New delete endpoint
+	r.GET("/sampledata", getSampleData) // New sampledata endpoint
 
 	log.Println("Server starting on :8080")
 	if err := r.Run(":8081"); err != nil {
