@@ -19,8 +19,8 @@ import (
 var (
 	users = make(map[string]string) // In-memory storage: username -> hashed password
 
-	subscriptions     = make(map[string]string) // In-memory storage: id -> targetUrl
-	subscriptionsMutex sync.Mutex             // Mutex for protecting access to the subscriptions map
+	subscriptions      = make(map[string]string) // In-memory storage: id -> targetUrl
+	subscriptionsMutex sync.Mutex                // Mutex for protecting access to the subscriptions map
 	// Replace with a strong, unique secret key for JWT signing
 	jwtSecret = []byte("your-secret-key")
 )
@@ -218,7 +218,23 @@ func getSampleData(c *gin.Context) {
 	c.JSON(http.StatusOK, sampleData)
 }
 
+func getSubscriptions(c *gin.Context) {
+	// Create a slice to hold the subscription data
+	var subscriptionList []map[string]string
 
+	// Lock the mutex while accessing the subscriptions map
+	subscriptionsMutex.Lock()
+	// Iterate over the subscriptions map and add each subscription to the list
+	for id, targetUrl := range subscriptions {
+		subscriptionList = append(subscriptionList, map[string]string{
+			"id":        id,
+			"targetUrl": targetUrl,
+		})
+	}
+	subscriptionsMutex.Unlock()
+
+	c.JSON(http.StatusOK, subscriptionList)
+}
 
 func main() {
 	r := gin.Default()
@@ -226,9 +242,10 @@ func main() {
 	r.POST("/register", register)
 	r.POST("/signin", signin)
 	r.GET("/me", me)
-	r.POST("/subscribe", subscribe) // New subscribe endpoint
-	r.DELETE("/subscribe/:id", unsubscribe) // New delete endpoint
-	r.GET("/sampledata", getSampleData) // New sampledata endpoint
+	r.POST("/subscribe", subscribe)           // New subscribe endpoint
+	r.DELETE("/subscribe/:id", unsubscribe)   // New delete endpoint
+	r.GET("/sampledata", getSampleData)       // New sampledata endpoint
+	r.GET("/subscriptions", getSubscriptions) // New get subscriptions endpoint
 
 	log.Println("Server starting on :8080")
 	if err := r.Run(":8081"); err != nil {
