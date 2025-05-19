@@ -41,7 +41,11 @@ type Claims struct {
 }
 
 type SubscribeRequest struct {
-	TargetUrl string `json:"targetUrl" binding:"required"`
+	TargetUrl string `json:"hookUrl" binding:"required"`
+}
+
+type UnsubscribeRequest struct {
+	TargetUrl string `json:"targetUrl"`
 }
 
 // generateJWT generates a new JWT token for the given username.
@@ -190,7 +194,15 @@ func subscribe(c *gin.Context) {
 }
 
 func unsubscribe(c *gin.Context) {
-	id := c.Param("id")
+	var req UnsubscribeRequest
+
+	// Bind JSON body
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid request"})
+		return
+	}
+
+	id := req.TargetUrl
 
 	subscriptionsMutex.Lock()
 	_, exists := subscriptions[id]
@@ -243,7 +255,7 @@ func main() {
 	r.POST("/signin", signin)
 	r.GET("/me", me)
 	r.POST("/subscribe", subscribe)           // New subscribe endpoint
-	r.DELETE("/subscribe/:id", unsubscribe)   // New delete endpoint
+	r.DELETE("/subscribe", unsubscribe)       // New delete endpoint
 	r.GET("/sampledata", getSampleData)       // New sampledata endpoint
 	r.GET("/subscriptions", getSubscriptions) // New get subscriptions endpoint
 
